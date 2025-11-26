@@ -9,7 +9,7 @@ bytesize = "2.3.0"
 clap = { version = "4.5.53", features = ["derive", "env"] }
 futures-util = "0.3.31"
 jiff = { version = "0.2.16", features = ["serde"] }
-reqwest = { version = "0.12.9", features = [
+reqwest = { version = "0.12.24", features = [
     "http2",
     "json",
     "rustls-tls",
