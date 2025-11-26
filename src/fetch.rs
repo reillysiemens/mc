@@ -24,6 +24,7 @@ pub enum Fetch {
 }
 
 impl Fetch {
+    // TODO: Consider using trace logging for some finer details like versions, SHA1, sizes, URLs, etc.
     pub async fn execute(&self) -> anyhow::Result<()> {
         // TODO: Should this use a default User-Agent?
         let client = Client::builder()
@@ -32,7 +33,7 @@ impl Fetch {
             .min_tls_version(tls::Version::TLS_1_3)
             .build()?;
 
-        tracing::debug!("Fetching Minecraft version manifest");
+        tracing::debug!("Fetching version manifest");
         let manifest: VersionManifest = client
             .get(VERSION_MANIFEST_URL)
             .send()
@@ -40,6 +41,7 @@ impl Fetch {
             .json()
             .await?;
 
+        // TODO: Consider logging whether a version is requested or is latest.
         let version = match self {
             Fetch::Version(version) => manifest
                 .version(version)
@@ -52,7 +54,7 @@ impl Fetch {
             },
         };
 
-        tracing::debug!("Fetching Minecraft version metadata");
+        tracing::debug!("Fetching version {} metadata", version.id);
         let version_metadata: VersionMetadata =
             client.get(version.url).send().await?.json().await?;
 
@@ -62,21 +64,27 @@ impl Fetch {
 
         match tokio::fs::read(SERVER_PATH).await {
             Ok(data) => {
-                if sha1_hex(&data) == server.sha1 {
-                    tracing::debug!("Skipping download. Server exists and matches checksum");
+                tracing::debug!("Found existing {SERVER_PATH}, verifying checksum");
+                let actual = sha1_hex(&data);
+                if actual == server.sha1 {
+                    tracing::debug!("Checksum matches, skipping download");
                     return Ok(());
                 }
-                tracing::debug!("Server exists, but does not match checksum");
+                tracing::debug!(
+                    "Checksum mismatch (expected: {}, actual: {})",
+                    server.sha1,
+                    actual
+                );
             }
             Err(err) if err.kind() == ErrorKind::NotFound => {
-                tracing::debug!("Existing server not found");
+                tracing::debug!("Existing {SERVER_PATH} not found");
             }
             Err(err) => return Err(err.into()),
         }
 
         // Download to temporary file first, then move on success
         let prefix: u64 = rand::random();
-        let temp_path = format!("{prefix:x}.{SERVER_PATH}");
+        let temp_path = format!("{prefix:x}-{SERVER_PATH}");
         let mut file = tokio::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -85,7 +93,7 @@ impl Fetch {
             .await
             .context("Failed to create temporary file")?;
 
-        tracing::debug!("Fetching Minecraft server");
+        tracing::debug!("Fetching server version {}", version.id);
         let mut stream = client.get(server.url).send().await?.bytes_stream();
 
         tracing::debug!("Writing {} to {temp_path}", ByteSize(server.size));
@@ -98,11 +106,19 @@ impl Fetch {
 
         let computed = format!("{:x}", hasher.finalize());
         if computed != server.sha1 {
-            tracing::error!("SHA-1 checksum is invalid");
+            tracing::error!(
+                "SHA-1 checksum is invalid (expected: {}, actual: {})",
+                server.sha1,
+                computed
+            );
             tokio::fs::remove_file(&temp_path)
                 .await
                 .context("Failed to cleanup temporary file")?;
-            return Err(anyhow!("Checksum mismatch"));
+            return Err(anyhow!(
+                "Checksum mismatch: expected {}, got {}",
+                server.sha1,
+                computed
+            ));
         }
 
         tracing::debug!("SHA-1 checksum is valid");
