@@ -1,6 +1,8 @@
 use clap::ValueEnum;
 use tracing::level_filters::LevelFilter;
 
+pub const DEFAULT_FILTER: &str = "mc";
+
 // Allow users to set log level as an enum, restricting them to valid choices.
 #[derive(Copy, Clone, Debug, Default, ValueEnum)]
 pub enum LogLevel {

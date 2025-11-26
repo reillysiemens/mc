@@ -25,4 +25,13 @@ pub struct Args {
         default_value_t = logging::LogLevel::default()
     )]
     pub log_level: logging::LogLevel,
+
+    // https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/struct.SubscriberBuilder.html#method.with_env_filter
+    /// Control logging filter, may override verbosity
+    #[arg(long, env = env::LOG_FILTER, default_value = logging::DEFAULT_FILTER )]
+    pub log_filter: String,
+
+    /// Server version
+    #[arg(long, env = env::SERVER_VERSION)]
+    pub server_version: Option<String>,
 }

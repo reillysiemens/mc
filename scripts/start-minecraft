@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -e -o pipefail
+
+name=$(basename $0)
+srcdir=$(dirname $(dirname $0))
+datadir="$(readlink -f ${srcdir})/data"
+
+# Library imports.
+source "${srcdir}/lib/errors.sh"
+source "${srcdir}/lib/logging.sh"
+source "${srcdir}/lib/colors.sh"
+
+: ${java="/usr/bin/java"}
+: ${max_memory="2048"}
+: ${min_memory="2048"}
+: ${server_jar="${datadir}/server.jar"}
+: ${java_args="-Xmx${max_memory}M -Xms${min_memory}M -jar ${server_jar} --nogui"}
+
+# Register an error handler.
+trap 'handle_error $LINENO' ERR
+
+cd $datadir
+log_debug "Switched to ${datadir}"
+
+echo 'eula=true' > "${datadir}/eula.txt"
+log_debug "Accepted EULA"
+
+# TODO: Starting is good, but how to we stop gracefully?
+log_info "Starting Minecraft"
+$java $java_args

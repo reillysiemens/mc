@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -e -o pipefail
+
+name=$(basename $0)
+srcdir=$(dirname $(dirname $0))
+
+# Library imports.
+source "${srcdir}/lib/errors.sh"
+source "${srcdir}/lib/logging.sh"
+source "${srcdir}/lib/colors.sh"
+
+# Register an error handler.
+trap 'handle_error $LINENO' ERR
+
+: ${launchermeta_url="https://launchermeta.mojang.com/mc/game/version_manifest.json"}
+: ${tmpdir="/tmp/fetch-latest-server"}
+: ${version_manifest="${tmpdir}/version_manifest.json"}
+: ${latest_metadata="${tmpdir}/latest_metadata.json"}
+: ${server_jar="./data/server.jar"}
+: ${sha1_checksum_file="${tmpdir}/checksum.txt"}
+
+log_info "Searching for Minecraft release metadata"
+
+mkdir -p $tmpdir
+log_debug "Created temporary metadata storage at $(color8 22 ${tmpdir})"
+
+log_debug "Fetching version manifest from $(color8 28 ${launchermeta_url})"
+curl -sL $launchermeta_url > $version_manifest
+
+latest_release=$(jq -r '.latest.release' $version_manifest)
+log_debug "Found latest release: $(yellow ${latest_release})"
+
+latest_url=$(jq -r '.versions[] | select(.id == "'${latest_release}'").url' $version_manifest)
+log_debug "Fetching metadata for $(yellow ${latest_relase}) from $(color8 28 ${latest_url})"
+curl -sL $latest_url > $latest_metadata
+
+latest_sha1=$(jq -r '.downloads.server.sha1' $latest_metadata)
+log_debug "Found SHA1 checksum for $(yellow ${latest_release}): $(magenta ${latest_sha1})"
+echo $latest_sha1 $server_jar > $sha1_checksum_file
+
+if [ -f ${server_jar} ] && sha1sum -c ${sha1_checksum_file} > /dev/null; then
+    # The current server is already at the latest version. No need to download.
+    server_jar=$(readlink -f ${server_jar})
+    log_info "Skipping download. $(color8 22 ${server_jar}) exists and matches latest checksum"
+else
+    # A new server is available. Download it.
+    latest_server=$(jq -r '.downloads.server.url' $latest_metadata)
+    log_debug "Found server download for $(yellow ${latest_release}): $(color8 28 ${latest_server})"
+
+    curl -sL $latest_server > $server_jar
+    server_jar=$(readlink -f ${server_jar})
+    log_info "Downloaded Minecraft server $(yellow ${latest_release}) to $(color8 22 ${server_jar})"
+
+    sha1sum -c $sha1_checksum_file > /dev/null
+    log_debug "New file $(color8 22 ${server_jar}) matches checksum: $(magenta ${latest_sha1})"
+fi
+
+rm -rf $tmpdir
+log_debug "Removed temporary metadata storage at $(color8 22 ${tmpdir})"

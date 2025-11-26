@@ -1,12 +1,49 @@
+mod cli;
+mod fetch;
+mod manifest;
+
 use clap::Parser;
 
-mod cli;
+use fetch::Fetch;
+use manifest::Type;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
     tracing_subscriber::fmt()
         .with_max_level(args.log_level)
+        .with_env_filter(EnvFilter::try_new(args.log_filter)?)
         .init();
-    tracing::info!("Hello, World!");
+
+    // ---- Getting the server ----
+
+    let fetch = match args.server_version {
+        Some(version) => Fetch::Version(version),
+        None => Fetch::Latest(Type::Release),
+    };
+
+    fetch.execute().await?;
+
+    // Fetch manifest
+    // version = manifest[latest] if version.is_none() else version
+    // Go fetch version info
+    // Compare checksum
+    // If no match, download and replace
+
+    // Download a new version...
+    // This should probably be done to temp storage and switched at the last moment.
+
+    // ---- Running the server ----
+
+    // Is there a EULA in the current directory?
+    // - Ensure it has been accepted.
+    // - Always write eula=true to a file?
+    // - Should this require an environment variable or direct the user to a link?
+
+    // Start the Minecraft server.
+    // - Wrap the child process in something that interrupts SIGTERM and tries
+    //   to cleanly shutdown.
+
+    Ok(())
 }
