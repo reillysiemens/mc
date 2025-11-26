@@ -90,7 +90,7 @@ impl Fetch {
         tracing::debug!("Fetching Minecraft server");
         let mut stream = client.get(server.url).send().await?.bytes_stream();
 
-        tracing::debug!("Writing {} to disk", ByteSize(server.size as u64));
+        tracing::debug!("Writing {} to disk", ByteSize(server.size));
         while let Some(chunk) = stream.next().await {
             file.write_all(&chunk?).await?;
         }

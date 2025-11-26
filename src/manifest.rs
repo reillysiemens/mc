@@ -31,7 +31,7 @@ pub struct Version {
     pub release_time: Timestamp,
     pub sha1: String,
     #[serde(rename = "complianceLevel")]
-    pub compliance_level: i32,
+    pub compliance_level: u8,
 }
 
 /// This matches version manifest v2. https://minecraft.fandom.com/wiki/Version_manifest.json
@@ -53,7 +53,7 @@ impl VersionManifest {
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct Download {
     pub sha1: String,
-    pub size: i32,
+    pub size: u64,
     pub url: String,
 }
 
