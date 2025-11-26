@@ -1,6 +1,6 @@
 use std::io::ErrorKind;
 
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use bytesize::ByteSize;
 use futures_util::StreamExt;
 use reqwest::{Client, tls};
@@ -24,7 +24,6 @@ pub enum Fetch {
 }
 
 impl Fetch {
-    // TODO: Consider downloading this to temporary storage first and then moving when successful.
     pub async fn execute(&self) -> anyhow::Result<()> {
         // TODO: Should this use a default User-Agent?
         let client = Client::builder()
@@ -75,18 +74,21 @@ impl Fetch {
             Err(err) => return Err(err.into()),
         }
 
-        // TODO: Create random temporary storage location?
+        // Download to temporary file first, then move on success
+        let prefix: u64 = rand::random();
+        let temp_path = format!("{prefix:x}.{SERVER_PATH}");
         let mut file = tokio::fs::OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
-            .open(SERVER_PATH)
-            .await?;
+            .open(&temp_path)
+            .await
+            .context("Failed to create temporary file")?;
 
         tracing::debug!("Fetching Minecraft server");
         let mut stream = client.get(server.url).send().await?.bytes_stream();
 
-        tracing::debug!("Writing {} to disk", ByteSize(server.size));
+        tracing::debug!("Writing {} to {temp_path}", ByteSize(server.size));
         let mut hasher = Sha1::new();
         while let Some(chunk) = stream.next().await {
             let chunk = chunk?;
@@ -97,10 +99,18 @@ impl Fetch {
         let computed = format!("{:x}", hasher.finalize());
         if computed != server.sha1 {
             tracing::error!("SHA-1 checksum is invalid");
+            tokio::fs::remove_file(&temp_path)
+                .await
+                .context("Failed to cleanup temporary file")?;
             return Err(anyhow!("Checksum mismatch"));
         }
 
         tracing::debug!("SHA-1 checksum is valid");
+        tracing::debug!("Renaming {temp_path} to {SERVER_PATH}");
+        tokio::fs::rename(&temp_path, SERVER_PATH)
+            .await
+            .context("Failed to move temporary file to final location")?;
+
         Ok(())
     }
 }
