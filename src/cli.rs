@@ -17,7 +17,7 @@ const STYLE: Styles = Styles::styled()
 #[derive(Debug, Parser)]
 #[clap(version, styles=STYLE)]
 pub struct Args {
-    /// Control logging verbosity
+    /// Control logging level
     #[arg(
         long,
         value_enum,
