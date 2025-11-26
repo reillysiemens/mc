@@ -66,18 +66,14 @@ impl Fetch {
                 if sha1_hex(&data) == server.sha1 {
                     tracing::debug!("Skipping download. Server exists and matches checksum");
                     return Ok(());
-                } else {
-                    tracing::debug!("Server exists, but does not match checksum");
                 }
+                tracing::debug!("Server exists, but does not match checksum");
             }
-            Err(err) => match err.kind() {
-                ErrorKind::NotFound => tracing::debug!("Existing server not found"),
-                _ => {
-                    tracing::error!("Unexpected I/O error");
-                    Err(err)?
-                }
-            },
-        };
+            Err(err) if err.kind() == ErrorKind::NotFound => {
+                tracing::debug!("Existing server not found");
+            }
+            Err(err) => return Err(err.into()),
+        }
 
         // TODO: Create random temporary storage location?
         let mut file = tokio::fs::OpenOptions::new()
@@ -98,14 +94,13 @@ impl Fetch {
             file.write_all(&chunk).await?;
         }
 
-        tracing::debug!("Validating SHA-1 checksum");
         let computed = format!("{:x}", hasher.finalize());
-        if computed == server.sha1 {
-            tracing::debug!("SHA-1 checksum is valid");
-            Ok(())
-        } else {
+        if computed != server.sha1 {
             tracing::error!("SHA-1 checksum is invalid");
-            Err(anyhow!("Checksum mismatch"))
+            return Err(anyhow!("Checksum mismatch"));
         }
+
+        tracing::debug!("SHA-1 checksum is valid");
+        Ok(())
     }
 }
