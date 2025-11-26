@@ -91,13 +91,16 @@ impl Fetch {
         let mut stream = client.get(server.url).send().await?.bytes_stream();
 
         tracing::debug!("Writing {} to disk", ByteSize(server.size));
+        let mut hasher = Sha1::new();
         while let Some(chunk) = stream.next().await {
-            file.write_all(&chunk?).await?;
+            let chunk = chunk?;
+            hasher.update(&chunk);
+            file.write_all(&chunk).await?;
         }
 
         tracing::debug!("Validating SHA-1 checksum");
-        let data = tokio::fs::read(SERVER_PATH).await?;
-        if sha1_hex(&data) == server.sha1 {
+        let computed = format!("{:x}", hasher.finalize());
+        if computed == server.sha1 {
             tracing::debug!("SHA-1 checksum is valid");
             Ok(())
         } else {
