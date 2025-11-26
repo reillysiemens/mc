@@ -3,31 +3,18 @@ use std::io::ErrorKind;
 use anyhow::anyhow;
 use bytesize::ByteSize;
 use futures_util::StreamExt;
-use reqwest::{tls, Client};
+use reqwest::{Client, tls};
 use sha1::{Digest, Sha1};
 use tokio::io::AsyncWriteExt;
 
-use crate::manifest::{Downloads, Type, VersionManifest, VersionMetadata, VERSION_MANIFEST_URL};
+use crate::manifest::{Downloads, Type, VERSION_MANIFEST_URL, VersionManifest, VersionMetadata};
 
 static SERVER_PATH: &str = "server.jar";
 
 static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-#[derive(Debug)]
-enum Checksum {
-    Valid,
-    Invalid,
-}
-
-impl Checksum {
-    fn validate(data: &[u8], sha1: &str) -> Self {
-        let hex_digest = format!("{:x}", Sha1::digest(data));
-        if hex_digest == sha1 {
-            Self::Valid
-        } else {
-            Self::Invalid
-        }
-    }
+fn sha1_hex(data: &[u8]) -> String {
+    format!("{:x}", Sha1::digest(data))
 }
 
 #[derive(Debug)]
@@ -75,13 +62,14 @@ impl Fetch {
         } = version_metadata;
 
         match tokio::fs::read(SERVER_PATH).await {
-            Ok(data) => match Checksum::validate(&data, &server.sha1) {
-                Checksum::Valid => {
+            Ok(data) => {
+                if sha1_hex(&data) == server.sha1 {
                     tracing::debug!("Skipping download. Server exists and matches checksum");
                     return Ok(());
+                } else {
+                    tracing::debug!("Server exists, but does not match checksum");
                 }
-                Checksum::Invalid => tracing::debug!("Server exists, but does not match checksum"),
-            },
+            }
             Err(err) => match err.kind() {
                 ErrorKind::NotFound => tracing::debug!("Existing server not found"),
                 _ => {
@@ -109,7 +97,7 @@ impl Fetch {
 
         tracing::debug!("Validating SHA-1 checksum");
         let data = tokio::fs::read(SERVER_PATH).await?;
-        if let Checksum::Valid = Checksum::validate(&data, &server.sha1) {
+        if sha1_hex(&data) == server.sha1 {
             tracing::debug!("SHA-1 checksum is valid");
             Ok(())
         } else {
