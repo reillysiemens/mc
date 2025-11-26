@@ -2,16 +2,16 @@ mod env;
 mod logging;
 
 use clap::{
-    builder::styling::{AnsiColor, Styles},
     Parser,
+    builder::styling::{AnsiColor, Effects, Styles},
 };
 
-// Clap v4 defaults to a colorless style. This emulates the colored v3 style.
+// Use a cargo-inspired colorscheme.
 const STYLE: Styles = Styles::styled()
-    .usage(AnsiColor::Yellow.on_default().underline())
-    .header(AnsiColor::Yellow.on_default().underline())
-    .literal(AnsiColor::Green.on_default())
-    .placeholder(AnsiColor::White.on_default());
+    .usage(AnsiColor::BrightGreen.on_default().effects(Effects::BOLD))
+    .header(AnsiColor::BrightGreen.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::BrightCyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
 
 /// Minecraft server management toolkit
 #[derive(Debug, Parser)]
