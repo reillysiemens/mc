@@ -1,8 +1,7 @@
 mod env;
 mod logging;
 
-use std::path::PathBuf;
-
+use camino::Utf8PathBuf;
 use clap::{
     Parser,
     builder::styling::{AnsiColor, Effects, Styles},
@@ -37,7 +36,7 @@ pub struct Args {
     #[arg(long, env = env::SERVER_VERSION)]
     pub server_version: Option<String>,
 
-    /// Directory
+    /// Set workspace directory
     #[arg(long, env = env::DIRECTORY)]
-    pub directory: Option<PathBuf>,
+    pub directory: Option<Utf8PathBuf>,
 }

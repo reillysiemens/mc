@@ -21,8 +21,13 @@ async fn main() -> anyhow::Result<()> {
 
     // ---- Initial workspace preparation ----
 
-    let directory = args.directory.unwrap_or(current_dir()?);
-    workspace::prepare(directory).await?;
+    // Is there a EULA in the current directory?
+    // - Ensure it has been accepted.
+    // - Always write eula=true to a file?
+    // - Should this require an environment variable or direct the user to a link?
+
+    let directory = args.directory.unwrap_or(current_dir()?.try_into()?);
+    workspace::prepare(&directory).await?;
 
     // ---- Getting the server ----
 
@@ -34,11 +39,6 @@ async fn main() -> anyhow::Result<()> {
     fetch.execute().await?;
 
     // ---- Running the server ----
-
-    // Is there a EULA in the current directory?
-    // - Ensure it has been accepted.
-    // - Always write eula=true to a file?
-    // - Should this require an environment variable or direct the user to a link?
 
     // Start the Minecraft server.
     // - Wrap the child process in something that interrupts SIGTERM and tries
