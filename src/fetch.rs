@@ -1,7 +1,8 @@
 use std::io::ErrorKind;
 
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use bytesize::ByteSize;
+use fs_err::tokio as fs;
 use futures_util::StreamExt;
 use reqwest::{Client, tls};
 use sha1::{Digest, Sha1};
@@ -62,7 +63,7 @@ impl Fetch {
             downloads: Downloads { server },
         } = version_metadata;
 
-        match tokio::fs::read(SERVER_PATH).await {
+        match fs::read(SERVER_PATH).await {
             Ok(data) => {
                 tracing::debug!("Found existing {SERVER_PATH}, verifying checksum");
                 let actual = sha1_hex(&data);
@@ -85,13 +86,12 @@ impl Fetch {
         // Download to temporary file first, then move on success
         let prefix: u64 = rand::random();
         let temp_path = format!("{prefix:x}-{SERVER_PATH}");
-        let mut file = tokio::fs::OpenOptions::new()
+        let mut file = fs::OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(true)
             .open(&temp_path)
-            .await
-            .context("Failed to create temporary file")?;
+            .await?;
 
         tracing::debug!("Fetching server version {}", version.id);
         let mut stream = client.get(server.url).send().await?.bytes_stream();
@@ -111,9 +111,7 @@ impl Fetch {
                 server.sha1,
                 computed
             );
-            tokio::fs::remove_file(&temp_path)
-                .await
-                .context("Failed to cleanup temporary file")?;
+            fs::remove_file(&temp_path).await?;
             return Err(anyhow!(
                 "Checksum mismatch: expected {}, got {}",
                 server.sha1,
@@ -123,9 +121,7 @@ impl Fetch {
 
         tracing::debug!("SHA-1 checksum is valid");
         tracing::debug!("Renaming {temp_path} to {SERVER_PATH}");
-        tokio::fs::rename(&temp_path, SERVER_PATH)
-            .await
-            .context("Failed to move temporary file to final location")?;
+        fs::rename(&temp_path, SERVER_PATH).await?;
 
         Ok(())
     }

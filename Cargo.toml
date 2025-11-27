@@ -8,6 +8,7 @@ anyhow = "1.0.100"
 bytesize = "2.3.0"
 camino = "1.2.1"
 clap = { version = "4.5.53", features = ["derive", "env"] }
+fs-err = { version = "3.2.0", features = ["tokio"] }
 futures-util = "0.3.31"
 jiff = { version = "0.2.16", features = ["serde"] }
 rand = "0.9.2"

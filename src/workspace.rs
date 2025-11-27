@@ -2,6 +2,7 @@ use std::env::set_current_dir;
 
 use anyhow::Context;
 use camino::{Utf8Path, Utf8PathBuf};
+use fs_err::tokio as fs;
 
 /// Prepare a workspace directory for the Minecraft server.
 ///
@@ -9,18 +10,13 @@ use camino::{Utf8Path, Utf8PathBuf};
 /// and changes the process's working directory to it.
 pub async fn prepare(directory: &Utf8Path) -> anyhow::Result<()> {
     // Create directory if it doesn't exist
-    tokio::fs::create_dir_all(directory)
-        .await
-        .with_context(|| format!("Failed to create directory: {directory}"))?;
+    fs::create_dir_all(directory).await?;
 
     // Canonicalize path
-    let directory: Utf8PathBuf = tokio::fs::canonicalize(directory)
-        .await
-        .with_context(|| format!("Failed to canonicalize directory: {directory}"))?
-        .try_into()?;
+    let directory: Utf8PathBuf = fs::canonicalize(directory).await?.try_into()?;
 
     // Verify write permissions
-    let metadata = tokio::fs::metadata(&directory).await?;
+    let metadata = fs::metadata(&directory).await?;
     if metadata.permissions().readonly() {
         anyhow::bail!("Directory is not writable: {directory}");
     }
