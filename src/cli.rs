@@ -1,6 +1,8 @@
 mod env;
 mod logging;
 
+use std::path::PathBuf;
+
 use clap::{
     Parser,
     builder::styling::{AnsiColor, Effects, Styles},
@@ -34,4 +36,8 @@ pub struct Args {
     /// Server version
     #[arg(long, env = env::SERVER_VERSION)]
     pub server_version: Option<String>,
+
+    /// Directory
+    #[arg(long, env = env::DIRECTORY)]
+    pub directory: Option<PathBuf>,
 }

@@ -1,6 +1,9 @@
 mod cli;
 mod fetch;
 mod manifest;
+mod workspace;
+
+use std::env::current_dir;
 
 use clap::Parser;
 
@@ -16,6 +19,11 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::try_new(args.log_filter)?)
         .init();
 
+    // ---- Initial workspace preparation ----
+
+    let directory = args.directory.unwrap_or(current_dir()?);
+    workspace::prepare(directory).await?;
+
     // ---- Getting the server ----
 
     let fetch = match args.server_version {
@@ -24,15 +32,6 @@ async fn main() -> anyhow::Result<()> {
     };
 
     fetch.execute().await?;
-
-    // Fetch manifest
-    // version = manifest[latest] if version.is_none() else version
-    // Go fetch version info
-    // Compare checksum
-    // If no match, download and replace
-
-    // Download a new version...
-    // This should probably be done to temp storage and switched at the last moment.
 
     // ---- Running the server ----
 
