@@ -21,11 +21,6 @@ async fn main() -> anyhow::Result<()> {
 
     // ---- Initial workspace preparation ----
 
-    // Is there a EULA in the current directory?
-    // - Ensure it has been accepted.
-    // - Always write eula=true to a file?
-    // - Should this require an environment variable or direct the user to a link?
-
     let directory = args.directory.unwrap_or(current_dir()?.try_into()?);
     workspace::prepare(&directory).await?;
 

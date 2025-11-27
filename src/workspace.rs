@@ -61,3 +61,55 @@ fn is_eula_accepted(line: &str) -> bool {
     };
     key.trim() == "eula" && value.trim().eq_ignore_ascii_case("true")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test_case::test_case;
+
+    #[test]
+    fn test_is_eula_accepted_exact_match() {
+        assert!(is_eula_accepted("eula=true"));
+    }
+
+    #[test_case("eula=TRUE" ; "all uppercase")]
+    #[test_case("eula=True" ; "capitalized")]
+    #[test_case("eula=TrUe" ; "mixed case")]
+    #[test_case("eula=tRuE" ; "another mixed case")]
+    fn test_is_eula_accepted_case_insensitive(given: &str) {
+        assert!(is_eula_accepted(given));
+    }
+
+    #[test_case("  eula=true  " ; "leading and trailing whitespace")]
+    #[test_case("eula  =  true" ; "whitespace around equals")]
+    #[test_case("  eula  =  true  " ; "whitespace everywhere")]
+    fn test_is_eula_accepted_with_whitespace(given: &str) {
+        assert!(is_eula_accepted(given));
+    }
+
+    #[test_case("eula=false" ; "lowercase false")]
+    #[test_case("eula=FALSE" ; "uppercase false")]
+    fn test_is_eula_accepted_false_value(given: &str) {
+        assert!(!is_eula_accepted(given));
+    }
+
+    #[test_case("license=true" ; "wrong key license")]
+    #[test_case("accept=true" ; "wrong key accept")]
+    fn test_is_eula_accepted_wrong_key(given: &str) {
+        assert!(!is_eula_accepted(given));
+    }
+
+    #[test_case("eula true" ; "space instead of equals")]
+    #[test_case("eulatrue" ; "no separator")]
+    fn test_is_eula_accepted_no_equals(given: &str) {
+        assert!(!is_eula_accepted(given));
+    }
+
+    #[test_case("" ; "empty string")]
+    #[test_case("=" ; "just equals")]
+    #[test_case("eula=" ; "missing value")]
+    #[test_case("=true" ; "missing key")]
+    fn test_is_eula_accepted_empty_or_invalid(given: &str) {
+        assert!(!is_eula_accepted(given));
+    }
+}
