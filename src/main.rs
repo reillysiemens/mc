@@ -1,6 +1,7 @@
 mod cli;
 mod fetch;
 mod manifest;
+mod server;
 mod workspace;
 
 use std::env::current_dir;
@@ -38,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
     // Start the Minecraft server.
     // - Wrap the child process in something that interrupts SIGTERM and tries
     //   to cleanly shutdown.
+    let mut child = server::start(&directory).await?;
+    child.wait().await?;
 
     Ok(())
 }
