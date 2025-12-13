@@ -17,7 +17,7 @@ pub async fn start(server_dir: &Utf8Path) -> Result<()> {
         .stderr(Stdio::inherit());
 
     // TODO: Maybe log the full command line at trace level?
-    tracing::debug!("Starting Minecraft server with");
+    tracing::debug!("Starting Minecraft server");
 
     let status = cmd
         .spawn()
