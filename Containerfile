@@ -23,4 +23,9 @@ ENTRYPOINT ["/usr/local/bin/mc"]
 # TODO: Are these the right labels?
 LABEL maintainer="Reilly Siemens <reilly@tuckersiemens.com>"
 LABEL version="0.1.0"
-LABEL description="A Minecraft server manager"
+LABEL description="An opinionated Minecraft server"
+# TODO: Add more labels.
+# See https://github.com/opencontainers/image-spec/blob/main/annotations.md for more options:
+# LABEL org.opencontainers.image.licenses="<license>"
+# LABEL org.opencontainers.image.created="<timestamp>"
+# ...
