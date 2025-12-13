@@ -36,11 +36,9 @@ async fn main() -> anyhow::Result<()> {
 
     // ---- Running the server ----
 
-    // Start the Minecraft server.
-    // - Wrap the child process in something that interrupts SIGTERM and tries
-    //   to cleanly shutdown.
-    let mut child = server::start(&directory).await?;
-    child.wait().await?;
+    // TODO: Wrap the child process in something that interrupts SIGTERM and
+    // tries to cleanly shutdown.
+    server::start(&directory).await?;
 
     Ok(())
 }
