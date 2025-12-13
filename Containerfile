@@ -20,10 +20,10 @@ COPY --from=builder /app/target/release/mc /usr/local/bin
 RUN dnf install -y java-21-openjdk-headless
 ENTRYPOINT ["/usr/local/bin/mc"]
 
-# TODO: Are these the right labels?
-LABEL maintainer="Reilly Siemens <reilly@tuckersiemens.com>"
-LABEL version="0.1.0"
-LABEL description="An opinionated Minecraft server"
+# TODO: Are these the right labels? Should annotations be used instead?
+# LABEL maintainer="Reilly Siemens <reilly@tuckersiemens.com>"
+# LABEL version="0.1.0"
+# LABEL description="An opinionated Minecraft server"
 # TODO: Add more labels.
 # See https://github.com/opencontainers/image-spec/blob/main/annotations.md for more options:
 # LABEL org.opencontainers.image.licenses="<license>"
