@@ -36,10 +36,7 @@ async fn main() -> anyhow::Result<()> {
 
     // ---- Running the server ----
 
-    // TODO: Wrap the child process in something that interrupts SIGTERM and
-    // tries to cleanly shutdown. The child process has 10 seconds to exit after
-    // SIGTERM before SIGKILL is sent.
-    server::start(&directory).await?;
+    server::run(&directory).await?;
 
     Ok(())
 }
