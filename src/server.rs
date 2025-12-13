@@ -32,40 +32,37 @@ fn spawn(server_dir: &Utf8Path) -> Result<Child> {
 
 /// Attempt to gracefully shut down the server by sending the "stop" command.
 ///
-/// Returns `true` if the server exited within the timeout, `false` if it had
-/// to be forcefully killed.
+/// Waits up to `GRACEFUL_SHUTDOWN_TIMEOUT` for the server to exit. If the
+/// timeout is exceeded, the server is forcefully killed.
 async fn graceful_shutdown(
     child: &mut Child,
     mut stdin: Option<tokio::process::ChildStdin>,
-) -> bool {
+) -> Result<()> {
     // Try to send "stop" command via stdin
     if let Some(ref mut stdin) = stdin {
         tracing::debug!("Sending stop command to Minecraft server");
-        if let Err(e) = stdin.write_all(b"stop\n").await {
-            tracing::warn!("Failed to send stop command to server: {e}");
-        }
+        stdin
+            .write_all(b"stop\n")
+            .await
+            .context("Failed to send stop command to server")?;
     } else {
-        tracing::warn!("Minecraft server stdin is not available, cannot send stop command");
+        anyhow::bail!("Minecraft server stdin is not available, cannot send stop command");
     }
 
     // Wait for graceful exit or timeout
     tokio::select! {
         result = child.wait() => {
-            match result {
-                Ok(status) => tracing::debug!("Server exited gracefully with status: {status}"),
-                Err(e) => tracing::error!("Error waiting for server: {e}"),
-            }
-            true
+            let status = result.context("Failed to wait on Minecraft server process")?;
+            tracing::debug!("Server exited with status: {status}");
+            Ok(())
         }
         () = tokio::time::sleep(GRACEFUL_SHUTDOWN_TIMEOUT) => {
             tracing::warn!(
                 "Server did not exit within {} seconds, sending SIGKILL",
                 GRACEFUL_SHUTDOWN_TIMEOUT.as_secs()
             );
-            if let Err(e) = child.kill().await {
-                tracing::error!("Failed to kill server process: {e}");
-            }
-            false
+            child.kill().await.context("Failed to kill server process")?;
+            Ok(())
         }
     }
 }
@@ -96,7 +93,7 @@ pub async fn run(server_dir: &Utf8Path) -> Result<()> {
         }
         _ = sigterm.recv() => {
             tracing::debug!("Received SIGTERM signal, initiating graceful shutdown");
-            graceful_shutdown(&mut child, stdin).await;
+            graceful_shutdown(&mut child, stdin).await?;
         }
     }
 
