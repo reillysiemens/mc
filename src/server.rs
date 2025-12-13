@@ -26,12 +26,10 @@ pub async fn start(server_dir: &Utf8Path) -> Result<()> {
         .await
         .context("Failed to wait on Minecraft server process")?;
 
-    if !status.success() {
-        return Err(anyhow::anyhow!(
-            "Minecraft server exited with non-zero status: {}",
-            status
-        ));
-    }
+    anyhow::ensure!(
+        status.success(),
+        "Minecraft server exited with non-zero status: {status}"
+    );
 
     Ok(())
 }
