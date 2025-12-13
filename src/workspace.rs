@@ -3,8 +3,10 @@ use std::env::set_current_dir;
 use anyhow::Context;
 use camino::{Utf8Path, Utf8PathBuf};
 use fs_err::tokio as fs;
+use jiff::Zoned;
 
 const EULA_PATH: &str = "eula.txt";
+const EULA_HEADER: &str = "By changing the setting below to TRUE you are indicating your agreement to our EULA (https://aka.ms/MinecraftEULA).";
 
 /// Prepare a workspace directory for the Minecraft server.
 ///
@@ -48,7 +50,9 @@ async fn accept_eula() -> anyhow::Result<()> {
     // TODO: Should this require an environment variable or direct the user to a link?
     // File doesn't exist or doesn't contain eula=true, (re)create it
     tracing::debug!("Accepting EULA in {EULA_PATH}");
-    fs::write(eula_path, "eula=true\n").await?;
+    let date = Zoned::now().strftime("%a %b %d %H:%M:%S %Z %Y");
+    let content = format!("#{EULA_HEADER}\n#{date}\neula=true\n");
+    fs::write(eula_path, &content).await?;
 
     Ok(())
 }
