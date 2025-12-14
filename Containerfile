@@ -6,6 +6,7 @@ COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 # TODO: Why does the console output report 'Compiling mc v0.0.1 (/app)'?
+# The version within the container does report as the Cargo.toml version...
 FROM chef AS builder 
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
