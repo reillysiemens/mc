@@ -75,8 +75,7 @@ async fn graceful_shutdown(
 pub async fn run(server_dir: &Utf8Path) -> Result<()> {
     let mut sigterm =
         signal(SignalKind::terminate()).context("Failed to register SIGTERM handler")?;
-
-    tracing::debug!("SIGTERM handler registered, PID: {}", std::process::id());
+    tracing::debug!("SIGTERM handler registered");
 
     let mut child = spawn(server_dir)?;
 
