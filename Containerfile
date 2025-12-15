@@ -5,8 +5,6 @@ FROM chef AS planner
 COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
-# TODO: Why does the console output report 'Compiling mc v0.0.1 (/app)'?
-# The version within the container does report as the Cargo.toml version...
 FROM chef AS builder 
 COPY --from=planner /app/recipe.json recipe.json
 # Build dependencies - this is the caching Docker layer!
@@ -16,10 +14,19 @@ COPY . .
 RUN cargo build --release
 
 # We do not need the Rust toolchain to run the binary!
-FROM fedora:latest AS runtime
-WORKDIR /app
+FROM docker.io/debian:trixie-slim AS runtime
+
+VOLUME ["/data"]
+WORKDIR /data
+
 COPY --from=builder /app/target/release/mc /usr/local/bin
-RUN dnf install -y java-21-openjdk-headless
+RUN apt-get update -y \
+    && apt-get install -y --no-install-recommends openjdk-21-jre-headless \
+    && apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
+USER 1000:1000
+EXPOSE 25565/tcp
 ENTRYPOINT ["/usr/local/bin/mc"]
 
 # TODO: Are these the right labels? Should annotations be used instead?
