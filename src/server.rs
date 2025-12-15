@@ -34,20 +34,17 @@ fn spawn(server_dir: &Utf8Path) -> Result<Child> {
 
 /// Read lines from stdin and send them to the channel.
 ///
-/// This runs on a dedicated OS thread (not tokio's blocking pool) so that
-/// terminating it doesn't block the tokio runtime shutdown. The thread will be
-/// killed when the process exits.
+/// Runs on a dedicated OS thread (not tokio's blocking pool) so that the
+/// blocked read won't prevent tokio runtime shutdown. The thread is killed
+/// when the process exits.
 fn spawn_stdin_reader(tx: mpsc::Sender<String>) {
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
-        let reader = stdin.lock();
-
-        for line in reader.lines() {
+        for line in stdin.lock().lines() {
             match line {
                 Ok(line) => {
-                    // Use blocking_send since we're on a std thread, not async
                     if tx.blocking_send(line).is_err() {
-                        break; // Receiver dropped
+                        break;
                     }
                 }
                 Err(_) => break,
@@ -71,6 +68,30 @@ async fn write_to_child(mut child_stdin: ChildStdin, mut rx: mpsc::Receiver<Stri
     }
 }
 
+/// Gracefully shut down the server by sending "stop" and waiting for exit.
+///
+/// If the server doesn't exit within the timeout, it is forcefully killed.
+async fn graceful_shutdown(child: &mut Child, tx: &mpsc::Sender<String>) -> Result<()> {
+    if tx.send("stop".to_string()).await.is_err() {
+        tracing::warn!("Failed to send stop command, channel closed");
+    }
+
+    tokio::select! {
+        result = child.wait() => {
+            let status = result.context("Failed to wait on Minecraft server process")?;
+            tracing::debug!("Server exited with status: {status}");
+            Ok(())
+        }
+        () = tokio::time::sleep(GRACEFUL_SHUTDOWN_TIMEOUT) => {
+            tracing::warn!(
+                "Server did not exit within {} seconds, sending SIGKILL",
+                GRACEFUL_SHUTDOWN_TIMEOUT.as_secs()
+            );
+            child.kill().await.context("Failed to kill server process")
+        }
+    }
+}
+
 /// Run the Minecraft server, handling SIGTERM for graceful shutdown.
 ///
 /// Forwards stdin to the server, allowing interactive commands. On SIGTERM,
@@ -90,17 +111,13 @@ pub async fn run(server_dir: &Utf8Path) -> Result<()> {
     // Both the stdin reader and the main task (for SIGTERM) can send to this.
     let (tx, rx) = mpsc::channel::<String>(32);
 
-    // Spawn a dedicated thread for reading stdin. Using a raw std::thread
-    // (rather than tokio's blocking pool) ensures that the blocked read
-    // won't prevent tokio runtime shutdown.
     spawn_stdin_reader(tx.clone());
 
-    // Spawn task: channel -> child stdin
     tokio::spawn(async move {
         write_to_child(child_stdin, rx).await;
     });
 
-    let result = tokio::select! {
+    tokio::select! {
         result = child.wait() => {
             let status = result.context("Failed to wait on Minecraft server process")?;
             anyhow::ensure!(
@@ -112,29 +129,7 @@ pub async fn run(server_dir: &Utf8Path) -> Result<()> {
         }
         _ = sigterm.recv() => {
             tracing::debug!("Received SIGTERM signal, initiating graceful shutdown");
-
-            // Send stop command through the channel
-            if tx.send("stop".to_string()).await.is_err() {
-                tracing::warn!("Failed to send stop command, channel closed");
-            }
-
-            // Wait for graceful exit or force kill after timeout
-            tokio::select! {
-                result = child.wait() => {
-                    let status = result.context("Failed to wait on Minecraft server process")?;
-                    tracing::debug!("Server exited with status: {status}");
-                }
-                () = tokio::time::sleep(GRACEFUL_SHUTDOWN_TIMEOUT) => {
-                    tracing::warn!(
-                        "Server did not exit within {} seconds, sending SIGKILL",
-                        GRACEFUL_SHUTDOWN_TIMEOUT.as_secs()
-                    );
-                    child.kill().await.context("Failed to kill server process")?;
-                }
-            }
-            Ok(())
+            graceful_shutdown(&mut child, &tx).await
         }
-    };
-
-    result
+    }
 }
