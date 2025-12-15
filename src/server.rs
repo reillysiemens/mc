@@ -1,13 +1,13 @@
-use std::io::BufRead;
-use std::process::Stdio;
-use std::time::Duration;
+use std::{io::BufRead, process::Stdio, time::Duration};
 
 use anyhow::{Context, Result};
 use camino::Utf8Path;
-use tokio::io::AsyncWriteExt;
-use tokio::process::{Child, ChildStdin, Command};
-use tokio::signal::unix::{SignalKind, signal};
-use tokio::sync::mpsc;
+use tokio::{
+    io::AsyncWriteExt,
+    process::{Child, ChildStdin, Command},
+    signal::unix::{SignalKind, signal},
+    sync::mpsc,
+};
 
 const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
