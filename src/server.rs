@@ -16,6 +16,10 @@ pub struct Config {
     pub directory: Utf8PathBuf,
     /// How long to wait for graceful shutdown before killing the server.
     pub shutdown_timeout: Duration,
+    /// Minimum heap size for the JVM (`-Xms`), e.g. `1G`, `512M`.
+    pub min_memory: String,
+    /// Maximum heap size for the JVM (`-Xmx`), e.g. `1G`, `512M`.
+    pub max_memory: String,
 }
 
 /// Spawn a Minecraft server as a child process.
@@ -24,16 +28,18 @@ pub struct Config {
 fn spawn(config: &Config) -> Result<Child> {
     let jar_path = config.directory.join("server.jar");
 
+    let xms = format!("-Xms{}", config.min_memory);
+    let xmx = format!("-Xmx{}", config.max_memory);
+
     let mut cmd = Command::new("java");
 
-    // TODO: Make settings configurable.
-    cmd.args(["-Xmx4096M", "-Xms4096M", "-jar", jar_path.as_str(), "nogui"])
+    cmd.args([&xms, &xmx, "-jar", jar_path.as_str(), "nogui"])
         .current_dir(&config.directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
 
-    tracing::debug!("Starting Minecraft server");
+    tracing::debug!("Executing: java {xms} {xmx} -jar {jar_path} nogui");
 
     cmd.spawn()
         .context("Failed to spawn Minecraft server process")

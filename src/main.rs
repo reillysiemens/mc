@@ -39,6 +39,8 @@ async fn main() -> anyhow::Result<()> {
     let config = server::Config {
         directory,
         shutdown_timeout: args.shutdown_timeout,
+        min_memory: args.min_memory,
+        max_memory: args.max_memory,
     };
     server::run(&config).await?;
 

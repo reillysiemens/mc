@@ -50,4 +50,12 @@ pub struct Args {
         value_parser = |s: &str| s.parse::<u64>().map(Duration::from_secs)
     )]
     pub shutdown_timeout: Duration,
+
+    /// Minimum heap size for the JVM (-Xms), e.g. 1G, 512M, 2048K
+    #[arg(long, env = env::MIN_MEMORY, default_value = "1G")]
+    pub min_memory: String,
+
+    /// Maximum heap size for the JVM (-Xmx), e.g. 1G, 512M, 2048K
+    #[arg(long, env = env::MAX_MEMORY, default_value = "1G")]
+    pub max_memory: String,
 }
