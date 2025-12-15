@@ -1,7 +1,7 @@
 use std::{io::BufRead, process::Stdio, time::Duration};
 
 use anyhow::{Context, Result};
-use camino::Utf8Path;
+use camino::Utf8PathBuf;
 use tokio::{
     io::AsyncWriteExt,
     process::{Child, ChildStdin, Command},
@@ -9,19 +9,26 @@ use tokio::{
     sync::mpsc,
 };
 
-const GRACEFUL_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+/// Configuration for running a Minecraft server.
+#[derive(Debug, Clone)]
+pub struct Config {
+    /// Path to the directory containing `server.jar`.
+    pub directory: Utf8PathBuf,
+    /// How long to wait for graceful shutdown before killing the server.
+    pub shutdown_timeout: Duration,
+}
 
 /// Spawn a Minecraft server as a child process.
 ///
 /// Returns the child process handle for lifecycle management.
-fn spawn(server_dir: &Utf8Path) -> Result<Child> {
-    let jar_path = server_dir.join("server.jar");
+fn spawn(config: &Config) -> Result<Child> {
+    let jar_path = config.directory.join("server.jar");
 
     let mut cmd = Command::new("java");
 
     // TODO: Make settings configurable.
     cmd.args(["-Xmx4096M", "-Xms4096M", "-jar", jar_path.as_str(), "nogui"])
-        .current_dir(server_dir)
+        .current_dir(&config.directory)
         .stdin(Stdio::piped())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit());
@@ -71,7 +78,11 @@ async fn write_to_child(mut child_stdin: ChildStdin, mut rx: mpsc::Receiver<Stri
 /// Gracefully shut down the server by sending "stop" and waiting for exit.
 ///
 /// If the server doesn't exit within the timeout, it is forcefully killed.
-async fn graceful_shutdown(child: &mut Child, tx: &mpsc::Sender<String>) -> Result<()> {
+async fn graceful_shutdown(
+    child: &mut Child,
+    tx: &mpsc::Sender<String>,
+    timeout: Duration,
+) -> Result<()> {
     if tx.send("stop".to_string()).await.is_err() {
         tracing::warn!("Failed to send stop command, channel closed");
     }
@@ -82,10 +93,10 @@ async fn graceful_shutdown(child: &mut Child, tx: &mpsc::Sender<String>) -> Resu
             tracing::debug!("Server exited with status: {status}");
             Ok(())
         }
-        () = tokio::time::sleep(GRACEFUL_SHUTDOWN_TIMEOUT) => {
+        () = tokio::time::sleep(timeout) => {
             tracing::warn!(
                 "Server did not exit within {} seconds, sending SIGKILL",
-                GRACEFUL_SHUTDOWN_TIMEOUT.as_secs()
+                timeout.as_secs()
             );
             child.kill().await.context("Failed to kill server process")
         }
@@ -96,12 +107,12 @@ async fn graceful_shutdown(child: &mut Child, tx: &mpsc::Sender<String>) -> Resu
 ///
 /// Forwards stdin to the server, allowing interactive commands. On SIGTERM,
 /// sends the "stop" command for graceful shutdown.
-pub async fn run(server_dir: &Utf8Path) -> Result<()> {
+pub async fn run(config: &Config) -> Result<()> {
     let mut sigterm =
         signal(SignalKind::terminate()).context("Failed to register SIGTERM handler")?;
     tracing::debug!("SIGTERM handler registered");
 
-    let mut child = spawn(server_dir)?;
+    let mut child = spawn(config)?;
     let child_stdin = child
         .stdin
         .take()
@@ -129,7 +140,7 @@ pub async fn run(server_dir: &Utf8Path) -> Result<()> {
         }
         _ = sigterm.recv() => {
             tracing::debug!("Received SIGTERM signal, initiating graceful shutdown");
-            graceful_shutdown(&mut child, &tx).await
+            graceful_shutdown(&mut child, &tx, config.shutdown_timeout).await
         }
     }
 }

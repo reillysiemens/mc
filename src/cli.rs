@@ -1,6 +1,8 @@
 mod env;
 mod logging;
 
+use std::time::Duration;
+
 use camino::Utf8PathBuf;
 use clap::{
     Parser,
@@ -39,4 +41,13 @@ pub struct Args {
     /// Set workspace directory
     #[arg(long, env = env::DIRECTORY)]
     pub directory: Option<Utf8PathBuf>,
+
+    /// Seconds to wait for graceful shutdown before killing the server
+    #[arg(
+        long,
+        env = env::SHUTDOWN_TIMEOUT,
+        default_value = "30",
+        value_parser = |s: &str| s.parse::<u64>().map(Duration::from_secs)
+    )]
+    pub shutdown_timeout: Duration,
 }

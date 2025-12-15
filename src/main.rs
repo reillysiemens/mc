@@ -36,7 +36,11 @@ async fn main() -> anyhow::Result<()> {
 
     // ---- Running the server ----
 
-    server::run(&directory).await?;
+    let config = server::Config {
+        directory,
+        shutdown_timeout: args.shutdown_timeout,
+    };
+    server::run(&config).await?;
 
     Ok(())
 }
