@@ -35,8 +35,8 @@ fn spawn(server_dir: &Utf8Path) -> Result<Child> {
 /// Read lines from stdin and send them to the channel.
 ///
 /// This runs on a dedicated OS thread (not tokio's blocking pool) so that
-/// terminating it doesn't block runtime shutdown. The thread will be killed
-/// when the process exits.
+/// terminating it doesn't block the tokio runtime shutdown. The thread will be
+/// killed when the process exits.
 fn spawn_stdin_reader(tx: mpsc::Sender<String>) {
     std::thread::spawn(move || {
         let stdin = std::io::stdin();
@@ -53,7 +53,6 @@ fn spawn_stdin_reader(tx: mpsc::Sender<String>) {
                 Err(_) => break,
             }
         }
-        tracing::debug!("Stdin reader thread exiting");
     });
 }
 
@@ -93,7 +92,7 @@ pub async fn run(server_dir: &Utf8Path) -> Result<()> {
 
     // Spawn a dedicated thread for reading stdin. Using a raw std::thread
     // (rather than tokio's blocking pool) ensures that the blocked read
-    // won't prevent runtime shutdown.
+    // won't prevent tokio runtime shutdown.
     spawn_stdin_reader(tx.clone());
 
     // Spawn task: channel -> child stdin
