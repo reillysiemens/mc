@@ -84,11 +84,7 @@ async fn write_to_child(mut child_stdin: ChildStdin, mut rx: mpsc::Receiver<Stri
 /// Gracefully shut down the server by sending "stop" and waiting for exit.
 ///
 /// If the server doesn't exit within the timeout, it is forcefully killed.
-async fn graceful_shutdown(
-    child: &mut Child,
-    tx: &mpsc::Sender<String>,
-    timeout: Duration,
-) -> Result<()> {
+async fn shutdown(child: &mut Child, tx: &mpsc::Sender<String>, timeout: Duration) -> Result<()> {
     if tx.send("stop".to_string()).await.is_err() {
         tracing::warn!("Failed to send stop command, channel closed");
     }
@@ -146,7 +142,7 @@ pub async fn run(config: &Config) -> Result<()> {
         }
         _ = sigterm.recv() => {
             tracing::debug!("Received SIGTERM signal, initiating graceful shutdown");
-            graceful_shutdown(&mut child, &tx, config.shutdown_timeout).await
+            shutdown(&mut child, &tx, config.shutdown_timeout).await
         }
     }
 }
