@@ -17,6 +17,7 @@ async fn main() -> anyhow::Result<()> {
     let args = cli::Args::parse();
     tracing_subscriber::fmt()
         .with_max_level(args.log_level)
+        // TODO: env filter seems to override max_level
         .with_env_filter(EnvFilter::try_new(args.log_filter)?)
         .init();
 

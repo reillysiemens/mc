@@ -41,8 +41,7 @@ fn spawn(config: &Config) -> Result<Child> {
 
     tracing::debug!("Executing: java {xms} {xmx} -jar {jar_path} nogui");
 
-    cmd.spawn()
-        .context("Failed to spawn Minecraft server process")
+    cmd.spawn().context("Failed to spawn server process")
 }
 
 /// Read lines from stdin and send them to the channel.
@@ -81,6 +80,20 @@ async fn write_to_child(mut child_stdin: ChildStdin, mut rx: mpsc::Receiver<Stri
     }
 }
 
+/// Wait for the child process to exit and log the exit code.
+async fn wait_for_child(child: &mut Child) -> Result<()> {
+    let status = child
+        .wait()
+        .await
+        .context("Failed to wait on server process")?;
+    if let Some(code) = status.code() {
+        tracing::debug!("Server terminated with code: {}", code);
+    } else {
+        tracing::warn!("Server terminated by signal");
+    }
+    Ok(())
+}
+
 /// Gracefully shut down the server by sending "stop" and waiting for exit.
 ///
 /// If the server doesn't exit within the timeout, it is forcefully killed.
@@ -90,11 +103,7 @@ async fn shutdown(child: &mut Child, tx: &mpsc::Sender<String>, timeout: Duratio
     }
 
     tokio::select! {
-        result = child.wait() => {
-            let status = result.context("Failed to wait on Minecraft server process")?;
-            tracing::debug!("Server exited with status: {status}");
-            Ok(())
-        }
+        result = wait_for_child(child) => result,
         () = tokio::time::sleep(timeout) => {
             tracing::warn!(
                 "Server did not exit within {} seconds, sending SIGKILL",
@@ -124,22 +133,16 @@ pub async fn run(config: &Config) -> Result<()> {
     // Both the stdin reader and the main task (for SIGTERM) can send to this.
     let (tx, rx) = mpsc::channel::<String>(32);
 
+    // Spawn a reader to forward stdin lines to the child process.
     spawn_stdin_reader(tx.clone());
 
+    // Spawn a task to write commands from the channel to the child's stdin.
     tokio::spawn(async move {
         write_to_child(child_stdin, rx).await;
     });
 
     tokio::select! {
-        result = child.wait() => {
-            let status = result.context("Failed to wait on Minecraft server process")?;
-            anyhow::ensure!(
-                status.success(),
-                "Minecraft server exited with non-zero status: {status}"
-            );
-            tracing::debug!("Server exited with status: {status}");
-            Ok(())
-        }
+        result = wait_for_child(&mut child) => result,
         _ = sigterm.recv() => {
             tracing::debug!("Received SIGTERM signal, initiating graceful shutdown");
             shutdown(&mut child, &tx, config.shutdown_timeout).await
