@@ -25,7 +25,7 @@ RUN apt-get update -y \
     && apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
-USER 1000:1000
+USER 25565:25565
 EXPOSE 25565/tcp
 ENTRYPOINT ["/usr/local/bin/mc"]
 
